@@ -1,5 +1,7 @@
 import sys
 import requests
+from dotenv import load_dotenv
+import os
 from PyQt5.QtWidgets import (QApplication, QWidget,
                              QPushButton, QLabel,
                              QLineEdit, QVBoxLayout)
@@ -9,7 +11,7 @@ from PyQt5.QtCore import Qt
 class WeatherApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.city_label = QLabel("Enter Cuty name", self)
+        self.city_label = QLabel("Enter City name", self)
         self.city_input = QLineEdit(self)
         self.get_weather_button = QPushButton("Get Weather", self)
         self.temperature_label = QLabel(self)
@@ -74,45 +76,81 @@ class WeatherApp(QWidget):
         self.get_weather_button.clicked.connect(self.get_weather)
 
     def get_weather(self):
-        api_key = "3154ae89e9ace537755ce82674fdb1ed"
-        city = self.city_input.text()
-        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}"
+        load_dotenv()
+        api_key = os.getenv("API_KEY")
+
+        if not api_key:
+            self.display_error("API key not found.\nCheck your .env file.")
+            return
+
+        city = self.city_input.text().strip()
+        if not city:
+            self.display_error("Please enter a city name.")
+            return
+
+        url = (
+            f"https://api.openweathermap.org/data/2.5/weather?"
+            f"q={city}&appid={api_key}&units=metric"
+        )
 
         try:
             response = requests.get(url)
             data = response.json()
 
-            if data["cod"] == 200:
+            if data.get("cod") == 200:
                 self.display_weather(data)
             else:
-                print(data)
+                self.display_error(
+                    f"Error: {data.get('message', 'City not found')}"
+                )
         except requests.exceptions.HTTPError as http_error:
             match response.status_code:
                 case 400:
-                    self.display_error("Bad request\nPlease check your input")
+                    self.display_error(
+                        "Bad Request:\nPlease check your input."
+                    )
                 case 401:
-                    self.display_errort("Unauthorized\nInvalid Api key")
+                    self.display_error(
+                        "Unauthorized:\nInvalid API key."
+                    )
                 case 403:
-                    self.display_error("Forbiddent\nAccess is denied")
+                    self.display_error("Forbidden:\nAccess is denied.")
                 case 404:
-                    self.display_error("Not found\nCity not found")
+                    self.display_error(
+                        "Not Found:\nCity not found."
+                    )
                 case 500:
-                    self.display_error("Internal server\nPlease try again later")
+                    self.display_error(
+                        "Internal Server Error:\nTry again later."
+                    )
                 case 502:
-                    self.display_error("Bad gateway\nInvalid response from the server")
+                    self.display_error(
+                        "Bad Gateway:\nInvalid response from server."
+                    )
                 case 503:
-                    self.display_error("Service Unavailablw\nServer is down")
+                    self.display_error(
+                        "Service Unavailable:\nServer is down."
+                    )
                 case 504:
-                    self.display_error("Gateway Timeout\nNo response from the server")
+                    self.display_error(
+                        "Gateway Timeout:\nNo response from server."
+                    )
                 case _:
-                    self.display_error(f"HTTP error occured\n{http_error}")
-
+                    self.display_error(
+                        f"HTTP Error:\n{http_error}"
+                    )
         except requests.exceptions.ConnectionError:
-            self.display_error("Connection Error:\nCheck your internet connection")
+            self.display_error(
+                "Connection Error:\nCheck your internet connection."
+            )
         except requests.exceptions.Timeout:
-            self.display_error("Timeout Error:\nThe request timed out")
+            self.display_error(
+                "Timeout Error:\nThe request timed out."
+            )
         except requests.exceptions.TooManyRedirects:
-            self.display_error("Too many redirects:\nCheck the URL")
+            self.display_error(
+                "Too Many Redirects:\nCheck the URL."
+            )
         except requests.exceptions.RequestException as req_error:
             self.display_error(f"Request Error:\n{req_error}")
 
@@ -123,9 +161,8 @@ class WeatherApp(QWidget):
     def display_weather(self, data):
         self.temperature_label.setStyleSheet("font-size: 75px;")
         try:
-            # Extract temperature (convert from Kelvin to Celsius)
-            temp_kelvin = data["main"]["temp"]
-            temp_celsius = round(temp_kelvin - 273.15)
+            # Temperature is already in Celsius
+            temp_celsius = round(data["main"]["temp"])
 
             # Extract weather description
             description = data["weather"][0]["description"].capitalize()
